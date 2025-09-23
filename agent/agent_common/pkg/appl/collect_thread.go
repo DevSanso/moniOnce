@@ -1,7 +1,6 @@
 package appl
 
 import (
-	"agent_common/pkg/constant"
 	"agent_common/pkg/logger"
 	"agent_common/pkg/util/types"
 	"context"
@@ -13,20 +12,17 @@ type CollectThread[DB any] struct {
 	recv_channel  types.Deque[types.CollectFn[DB]]
 	levelLogger   logger.LevelLogger
 	tartgetDbPool types.TargetDbPool[DB]
-
-	applCustomConfig map[string]string
 }
 
 func newCollectThread[DB any](send types.Pusher[types.CollectFnRet], recv types.Deque[types.CollectFn[DB]],
-	 log logger.LevelLogger, target types.TargetDbPool[DB], applCustomConfig map[string]string) CollectThread[DB] {
+	 log logger.LevelLogger, target types.TargetDbPool[DB]) CollectThread[DB] {
 
-	return CollectThread[DB]{send_channel: send, recv_channel: recv, levelLogger: log, tartgetDbPool: target, applCustomConfig : applCustomConfig}
+	return CollectThread[DB]{send_channel: send, recv_channel: recv, levelLogger: log, tartgetDbPool: target}
 }
 
 func (ct *CollectThread[DB]) GetConnCtx() (context.Context, context.CancelFunc) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second * 10)
-	retCtx := context.WithValue(ctx, constant.ApplCustomConfigCtxKey, ct.applCustomConfig)
-	return retCtx, cancelFn
+	return ctx, cancelFn
 }
 
 func (ct *CollectThread[DB]) Run(ctx context.Context) error {
@@ -44,7 +40,7 @@ func (ct *CollectThread[DB]) Run(ctx context.Context) error {
 			ct.levelLogger.Error("Get Connection Failed : ", connErr.Error())
 		}
 
-		datas, fnErr := fn(conn, connCtx)
+		datas, fnErr := fn(conn, connCtx, ct.levelLogger)
 		ctxCancelFn()
 
 		if fnErr == nil {

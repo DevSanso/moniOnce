@@ -22,31 +22,29 @@ type AgentApplication interface {
 	Run(ctx context.Context) error 
 }
 
-type implAgentApplication [DB any, DBCONF types.StrCloneToGetter]struct {
+type implAgentApplication [CONN any, DBCONF types.StrCloneToGetter]struct {
 	levelLogger       logger.LevelLogger
 	dataLoggers       map[int]logger.DataLogger[any]
 	applicationConfig *AgentApplicationConfig
 	configDb          *sql.DB
 
 	genDbLoggerFn      types.GenDbLoggerFn[DBCONF]
-	genTargetDbPoolrFn types.GenTargetDbPoolFn[DB, DBCONF]
-	intervals         []types.IntervalRegister[DB]
-
-	applCustomConfig      map[string]string
+	genTargetDbPoolrFn types.GenTargetDbPoolFn[CONN, DBCONF]
+	intervals         []types.IntervalRegister[CONN]
 	
 	lazy struct {
-		dbLogger          logger.DbLogger
-		targetDbPool      types.TargetDbPool[DB]
+		dbLogger          logger.ILogger
+		targetDbPool      types.TargetDbPool[CONN]
 		dbConfig          types.StrCloneToGetter
 
 		threads struct {
-			interval InternvalThread[DB]
-			collect  []CollectThread[DB]
+			interval InternvalThread[CONN]
+			collect  []CollectThread[CONN]
 			push     []PushThread
 		}
 
 		queue struct {
-			collectQueue types.Queue[types.CollectFn[DB]]
+			collectQueue types.Queue[types.CollectFn[CONN]]
 			pushQueue     types.Queue[types.CollectFnRet]
 		}
 
@@ -59,16 +57,15 @@ type implAgentApplication [DB any, DBCONF types.StrCloneToGetter]struct {
 	}
 }
 
-type AgentApplicationExtendInitConfig[DB any, DBCONF types.StrCloneToGetter] struct {
+type AgentApplicationExtendInitConfig[CONN any, DBCONF types.StrCloneToGetter] struct {
 	GenDbLoggerFn     types.GenDbLoggerFn[DBCONF]
-	GenTargetDbPoolrFn types.GenTargetDbPoolFn[DB, DBCONF]
+	GenTargetDbPoolrFn types.GenTargetDbPoolFn[CONN, DBCONF]
 	DataLoggers       map[int]logger.DataLogger[any]
-	Intervals         []types.IntervalRegister[DB]
+	Intervals         []types.IntervalRegister[CONN]
 }
 
-func InitAgentApplication[DB any, DBCONF types.StrCloneToGetter](configPath string, 
-		extend AgentApplicationExtendInitConfig[DB, DBCONF],
-		applCustomConfig map[string]string) (AgentApplication, error) {
+func InitAgentApplication[CONN any, DBCONF types.StrCloneToGetter](configPath string, 
+		extend AgentApplicationExtendInitConfig[CONN, DBCONF]) (AgentApplication, error) {
 	var initConfig AgentApplicationInitConfig
 	initData, readErr := os.ReadFile(configPath)
 	if readErr != nil {
@@ -104,7 +101,7 @@ func InitAgentApplication[DB any, DBCONF types.StrCloneToGetter](configPath stri
 		return nil, configGenErr
 	}
 
-	return &implAgentApplication[DB, DBCONF]{
+	return &implAgentApplication[CONN, DBCONF]{
 		levelLogger:       levelLogger,
 		dataLoggers:       extend.DataLoggers,
 		applicationConfig: configData,
@@ -112,11 +109,10 @@ func InitAgentApplication[DB any, DBCONF types.StrCloneToGetter](configPath stri
 		genDbLoggerFn: extend.GenDbLoggerFn,
 		intervals: extend.Intervals,
 		genTargetDbPoolrFn : extend.GenTargetDbPoolrFn,
-		applCustomConfig : applCustomConfig,
 	}, nil
 }
 
-func (ia *implAgentApplication[DB,DBCONF]) asyncRun(ctx context.Context) {
+func (ia *implAgentApplication[CONN,DBCONF]) asyncRun(ctx context.Context) {
 	isStop := true
 	queuePtr := &ia.lazy.queue
 
@@ -162,14 +158,14 @@ func (ia *implAgentApplication[DB,DBCONF]) asyncRun(ctx context.Context) {
 	ia.close()
 } 
 
-func (ia *implAgentApplication[DB, DBCONF]) genIntervalMap() (map[int][]types.IntervalRegister[DB],error) {
-	ret := make(map[int][]types.IntervalRegister[DB])
+func (ia *implAgentApplication[CONN, DBCONF]) genIntervalMap() (map[int][]types.IntervalRegister[CONN],error) {
+	ret := make(map[int][]types.IntervalRegister[CONN])
 
 	for _, confInterval := range ia.applicationConfig.intervals {
 		for _, codeInterval := range ia.intervals {
 			if confInterval.key == codeInterval.Name {
 				if ret[confInterval.inetervalSec] == nil {
-					ret[confInterval.inetervalSec] = make([]types.IntervalRegister[DB], 0)
+					ret[confInterval.inetervalSec] = make([]types.IntervalRegister[CONN], 0)
 				}
 
 				ret[confInterval.inetervalSec] = append(ret[confInterval.inetervalSec], codeInterval)
@@ -181,7 +177,7 @@ func (ia *implAgentApplication[DB, DBCONF]) genIntervalMap() (map[int][]types.In
 	return ret, nil
 }
 
-func (ia *implAgentApplication[DB, DBCONF]) lazyInit() error {
+func (ia *implAgentApplication[CONN, DBCONF]) lazyInit() error {
 	lazyPtr := &ia.lazy
 	
 	dbconf := *new(DBCONF)
@@ -206,18 +202,18 @@ func (ia *implAgentApplication[DB, DBCONF]) lazyInit() error {
 	lazyPtr.closes.targetDbPoolCloser = targetDbPoolCloser
 	lazyPtr.targetDbPool = targetDbPool
 
-	cQ := collection.NewStdQueue[types.CollectFn[DB]](ia.applicationConfig.Queue.CollectSize)
+	cQ := collection.NewStdQueue[types.CollectFn[CONN]](ia.applicationConfig.Queue.CollectSize)
 	pQ := collection.NewStdQueue[types.CollectFnRet](ia.applicationConfig.Queue.PushSize)
 
 	lazyPtr.closes.collectQCloser = cQ
 	lazyPtr.closes.pushQCloser = pQ
 
-	var collects []CollectThread[DB] = make([]CollectThread[DB], 0)
+	var collects []CollectThread[CONN] = make([]CollectThread[CONN], 0)
 	var pushs    []PushThread = make([]PushThread, 0)
 	
 
 	for i := 0; i< ia.applicationConfig.Thread.CollectCount ; i ++ {
-		collects = append(collects, newCollectThread(pQ, cQ, ia.levelLogger, lazyPtr.targetDbPool, ia.applCustomConfig))
+		collects = append(collects, newCollectThread(pQ, cQ, ia.levelLogger, lazyPtr.targetDbPool))
 	}
 
 	for i := 0; i< ia.applicationConfig.Thread.PushCount ; i ++ {
@@ -239,7 +235,7 @@ func (ia *implAgentApplication[DB, DBCONF]) lazyInit() error {
 	return nil
 }
 
-func (ia *implAgentApplication[DB, DBCONF])close() error {
+func (ia *implAgentApplication[CONN, DBCONF])close() error {
 	c := &ia.lazy.closes
 
 	if c.collectQCloser != nil {
@@ -261,7 +257,7 @@ func (ia *implAgentApplication[DB, DBCONF])close() error {
 	return nil
 }
 
-func (ia *implAgentApplication[DB, DBCONF]) Run(ctx context.Context) error {
+func (ia *implAgentApplication[CONN, DBCONF]) Run(ctx context.Context) error {
 	if err := ia.lazyInit(); err != nil {
 		ia.levelLogger.Error("lazy init failed :", err)
 		ia.close()

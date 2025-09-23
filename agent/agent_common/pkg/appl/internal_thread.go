@@ -7,22 +7,22 @@ import (
 	"time"
 )
 
-type InternvalThread[DB any] struct {
-	intervals    map[int][]types.IntervalRegister[DB]
-	send_channel types.Pusher[types.CollectFn[DB]]
+type InternvalThread[CONN any] struct {
+	intervals    map[int][]types.IntervalRegister[CONN]
+	send_channel types.Pusher[types.CollectFn[CONN]]
 
 	levelLogger logger.LevelLogger
 }
 
-func newIntervalThread[DB any](registers map[int][]types.IntervalRegister[DB], queue types.Pusher[types.CollectFn[DB]], levelLogger logger.LevelLogger) InternvalThread[DB] {
-	return InternvalThread[DB]{
+func newIntervalThread[CONN any](registers map[int][]types.IntervalRegister[CONN], queue types.Pusher[types.CollectFn[CONN]], levelLogger logger.LevelLogger) InternvalThread[CONN] {
+	return InternvalThread[CONN]{
 		registers,
 		queue,
 		levelLogger,
 	}
 }
 
-func (ih *InternvalThread[DB]) Run(ctx context.Context) error {
+func (ih *InternvalThread[CONN]) Run(ctx context.Context) error {
 	isStop := false
 
 	for !isStop {

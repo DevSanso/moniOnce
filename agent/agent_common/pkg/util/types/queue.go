@@ -19,5 +19,5 @@ type Pusher[T any] interface {
 }
 
 type Deque[T any] interface {
-	Pop() (T,error)
+	Pop() (T, error)
 }

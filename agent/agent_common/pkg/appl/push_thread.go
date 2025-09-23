@@ -10,10 +10,10 @@ import (
 type PushThread struct {
 	recv_channel types.Deque[types.CollectFnRet]
 	levelLogger logger.LevelLogger
-	dbLogger    logger.DbLogger
+	dbLogger    logger.ILogger
 }
 
-func newPushThread(recv types.Deque[types.CollectFnRet], log logger.LevelLogger, dbLogger  logger.DbLogger) PushThread {
+func newPushThread(recv types.Deque[types.CollectFnRet], log logger.LevelLogger, dbLogger  logger.ILogger) PushThread {
 	return PushThread{recv_channel: recv, levelLogger: log, dbLogger: dbLogger}
 }
 
@@ -22,8 +22,8 @@ func (pt *PushThread)Run(ctx context.Context) error {
 	
 	for !isStop {
 		data,_ := pt.recv_channel.Pop()
-		pt.levelLogger.Debug("pop ", data.Tablename," table data")
-		err := pt.dbLogger.Exec(data.Query, data.Data)
+		pt.levelLogger.Debug("pop ", data.Key," table data")
+		err := pt.dbLogger.Log(data.Key, data.Data)
 		if err != nil {
 			pt.levelLogger.Error("insert failed :", err.Error())
 		}
