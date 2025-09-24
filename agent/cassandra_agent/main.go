@@ -1,8 +1,8 @@
 package main
 
 import (
-	"agent_common/pkg/appl"
-	"agent_common/pkg/util/types"
+	"agent_common/pkg/applnew"
+	appltype "agent_common/pkg/applnew/types"
 	"context"
 	"log"
 	"os"
@@ -12,30 +12,26 @@ import (
 
 	"cassandra_agent/cassandra"
 	"cassandra_agent/collect"
-	"cassandra_agent/config"
+	agenttype "cassandra_agent/types"
 )
+
 
 func main() {
 	args := NewArgs()
-	
-	extend := appl.AgentApplicationExtendInitConfig[cassandra.CassandraCollectConnCtl, *config.DBConfig] {
-		GenTargetDbPoolrFn: cassandra.NewCassandraPool,
-		GenDbLoggerFn: cassandra.NewCassandraDbLogger,
-		DataLoggers: nil,
-		Intervals: []types.IntervalRegister[cassandra.CassandraCollectConnCtl]{
-			{Name : "cql.system.local", Fn : collect.CollectSystemLocalhandle},
-		},
-	}
 
-	server, err := appl.InitAgentApplication(args.configPath, extend, nil)
+	application := applnew.NewApplication[agenttype.PushData, *cassandra.CassandraConn, agenttype.FlagData]()
+	err := application.Init(appltype.InitData[agenttype.PushData, *cassandra.CassandraConn, agenttype.FlagData, *agenttype.FlagData]{
+		SettingPath: args.configPath, CollectM: collect.CollectMapping, CronM: nil, DataPusher: nil, GetConnPoolFn: cassandra.NewCassandraPool,
+	})
+
 	if err != nil {
-		log.Println("Main - Agent Application Init Failed :", err.Error())
+		log.Println("init failed : ", err.Error())
 		return
 	}
 
 	applCtx, cancelCtxFn := context.WithCancel(context.Background())
 
-	if runErr := server.Run(applCtx); runErr != nil {
+	if runErr := application.Run(applCtx); runErr != nil {
 		log.Println("Main - Server Run Error : ", runErr.Error())
 		return
 	}

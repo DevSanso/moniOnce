@@ -1,15 +1,12 @@
 package cassandra
 
 import (
-	"agent_common/pkg/logger"
-	"agent_common/pkg/util/types"
-	"cassandra_agent/config"
+	apptype "agent_common/pkg/applnew/types"
 	"context"
-	"io"
+	"fmt"
 
 	gocql "github.com/apache/cassandra-gocql-driver/v2"
 )
-
 
 type CassandraConnType string
 
@@ -20,54 +17,38 @@ const (
 
 type CassandraPool struct {
 	connectInfo *gocql.ClusterConfig
-
-
 }
 
-func newCassandraPool(conf *config.DBConfig) (*CassandraPool, io.Closer, error) {
-	cconf := gocql.NewCluster(conf.Cassnadra.Addr)
-	password := gocql.PasswordAuthenticator {
-		Username: conf.Cassnadra.User,
-		Password: conf.Cassnadra.Password,
-	}
-
-	cconf.Authenticator = password
-
-	cp := &CassandraPool {
-		connectInfo: cconf,
-	}
-
-	return cp, cp, nil
+// GetDbConn implements types.CollectConnPool.
+func (cp *CassandraPool) GetDbConn(ctx context.Context) (*CassandraConn, error) {
+	panic("unimplemented")
 }
 
-func NewCassandraPool(conf *config.DBConfig) (types.TargetDbPool[CassandraCollectConnCtl], io.Closer, error) {
-	return newCassandraPool(conf)
+type CassandraConn struct {
+	session *gocql.Session
 }
 
-func NewCassandraDbLogger(conf *config.DBConfig) (logger.DbLogger, io.Closer, error) {
-	return newCassandraPool(conf)
-}
-
-func (cp *CassandraPool) Exec(query string, args [][]any) error {
-	return nil	
-}
-
-func (cp *CassandraPool)GetDbConn(ctx context.Context) (CassandraCollectConnCtl, error) {
-	return CassandraCollectConnCtl{}, nil	
-}
-
-func (cp *CassandraPool)Close() error {
+func (cc *CassandraConn) Close() error {
+	cc.session.Close()
 	return nil
 }
 
-type CassandraCollectConnCtl struct {
-	connectInfo *gocql.ClusterConfig
+func (cp *CassandraPool) Close() error {
+	return nil
 }
 
-func (ccct *CassandraCollectConnCtl) GetCQLConnection() {
+func NewCassandraPool(IP string, Port int, User string, Password string, Dbname string, args ...any) (apptype.CollectConnPool[*CassandraConn], error) {
+	cconf := gocql.NewCluster(fmt.Sprintf("%s:%d", IP, Port))
+	password := gocql.PasswordAuthenticator{
+		Username: User,
+		Password: Password,
+	}
+	cconf.Keyspace = Dbname
+	cconf.Authenticator = password
 
-}
+	cp := &CassandraPool{
+		connectInfo: cconf,
+	}
 
-func (ccct *CassandraCollectConnCtl) GetNodeToolCmdConnection() {
-	
+	return cp, nil
 }

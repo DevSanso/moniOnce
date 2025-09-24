@@ -5,36 +5,52 @@ import (
 	apptype "agent_common/pkg/applnew/types"
 	"agent_common/pkg/util/types"
 	"context"
+	"io"
 	"time"
 )
 
-type CollectThread[PUSH any] struct {
+type CollectThread[PUSH any, CONN io.Closer] struct {
 	recv types.Deque[string]
 	pushSend types.Pusher[*PUSH]
-	mapping map[string]apptype.CollectFn[PUSH]
+	mapping map[string]apptype.CollectFn[PUSH, CONN]
 
+	collectConnPool apptype.CollectConnPool[CONN]
 	collectLogger logger.LevelLogger
 }
 
-func NewCollectThread[PUSH any](recv types.Deque[string], pusher types.Pusher[*PUSH], mapping map[string]apptype.CollectFn[PUSH], logger logger.LevelLogger) CollectThread[PUSH] {
-	return CollectThread[PUSH]{
+func NewCollectThread[PUSH any, CONN io.Closer](recv types.Deque[string], conn apptype.CollectConnPool[CONN], pusher types.Pusher[*PUSH], mapping map[string]apptype.CollectFn[PUSH, CONN], logger logger.LevelLogger) CollectThread[PUSH, CONN] {
+	return CollectThread[PUSH, CONN]{
 		recv: recv,
 		pushSend: pusher,
 		mapping: mapping,
 		collectLogger: logger,
+		collectConnPool: conn,
 	}
 }
 
-func (ct *CollectThread[PUSH])Run(ctx context.Context) error {
+func (ct *CollectThread[PUSH, CONN])Run(ctx context.Context) error {
 	isStop := false
 	for !isStop {
 		data,_ := ct.recv.Pop()
 
 		f, ok := ct.mapping[data]
-		ret, retErr := f(ctx, ct.collectLogger)
+
+		if !ok {
+			ct.collectLogger.Error("not support collect : ", data)
+			continue
+		}
+
+		conn, connErr := ct.collectConnPool.GetDbConn(ctx)
+		if connErr != nil {
+			ct.collectLogger.Error("conn get failed : ", connErr)
+			continue
+		}
+
+		ret, retErr := f(ctx, conn, ct.collectLogger)
 		if retErr != nil {
 			ct.collectLogger.Error("collectFn exec failed :", retErr.Error())
 		}
+		conn.Close()
 
 		if ret != nil {
 			ct.pushSend.Push(ret)

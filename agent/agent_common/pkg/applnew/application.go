@@ -21,10 +21,17 @@ type Application interface {
 	Run(context.Context) error
 }
 
-type implApplication[PUSH any, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
+type ApplicationInit[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] interface {
+	Init(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error 
+	Application
+}
+
+type implApplication[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
 	setting apptype.SettingData
 	configDB loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, * apptype.AppSyncData, FLAGPTR]
 	config *apptype.ApplConfData
+
+	collectConnPool apptype.CollectConnPool[CONN]
 
 	closer struct {
 		configDBCloser io.Closer
@@ -34,6 +41,12 @@ type implApplication[PUSH any, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG
 		pushLogCloser  io.Closer
 		intervalLogCloser  io.Closer
 		initLogCloser  io.Closer
+
+		cronQCloser io.Closer
+		pushQCloser io.Closer
+		collectQCloser io.Closer
+
+		collectConnPoolCloser io.Closer
 	}
 
 	queue struct {
@@ -43,7 +56,7 @@ type implApplication[PUSH any, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG
 	}
 
 	thread struct {
-		collectT []thread.CollectThread[PUSH]
+		collectT []thread.CollectThread[PUSH, CONN]
 		cronT    []thread.CronThread[PUSH,FLAG,FLAGPTR]
 		pushT    []thread.PushThread[PUSH]
 		intevalT thread.IntervalThread[FLAG,FLAGPTR]
@@ -58,7 +71,7 @@ type implApplication[PUSH any, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG
 	}
 }
 
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) initSetting(settingPath string) error {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initSetting(settingPath string) error {
 	initData, readErr := os.ReadFile(settingPath)
 	if readErr != nil {
 		return readErr
@@ -71,22 +84,26 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) initSetting(settingPath string) e
 }
 
 
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) initQueue() {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initQueue() {
 	i.queue.collectQ = collection.NewStdQueue[string](i.config.Queue.CollectSize)
 	i.queue.cronQ = collection.NewStdQueue[string](i.config.Queue.CollectSize)
 	i.queue.pushQ = collection.NewStdQueue[*PUSH](i.config.Queue.CollectSize)
+
+	i.closer.collectQCloser = i.queue.collectQ
+	i.closer.cronQCloser = i.queue.cronQ
+	i.closer.pushQCloser = i.queue.pushQ
 }
 
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) initThread(data apptype.InitData[PUSH, FLAG, FLAGPTR]) {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initThread(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) {
 	i.thread.intevalT = thread.NewIntervalThread(i.loggers.intervalLogger, i.configDB, i.queue.collectQ, i.queue.cronQ)
 	i.thread.cronT = make([]thread.CronThread[PUSH, FLAG, FLAGPTR], 1)
 	for n := 0; n < i.config.Thread.CronCount; n++ {
 		t := thread.NewCronThread(i.queue.cronQ, i.queue.pushQ, data.CronM, i.loggers.cronLogger, i.configDB)
 		i.thread.cronT = append(i.thread.cronT, t)
 	}
-	i.thread.collectT = make([]thread.CollectThread[PUSH], 1)
+	i.thread.collectT = make([]thread.CollectThread[PUSH, CONN], 1)
 	for n := 0; n < i.config.Thread.CollectCount; n++ {
-		t := thread.NewCollectThread(i.queue.cronQ, i.queue.pushQ, data.CollectM, i.loggers.collectLogger)
+		t := thread.NewCollectThread(i.queue.cronQ, i.collectConnPool, i.queue.pushQ, data.CollectM, i.loggers.collectLogger)
 		i.thread.collectT = append(i.thread.collectT, t)
 	}
 	i.thread.pushT = make([]thread.PushThread[PUSH], 1)
@@ -97,7 +114,7 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) initThread(data apptype.InitData[
 }
 
 
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) Init(data apptype.InitData[PUSH, FLAG, FLAGPTR]) error {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Init(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error {
 	if err := i.initSetting(data.SettingPath); err != nil {
 		return err
 	}
@@ -111,7 +128,12 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) Init(data apptype.InitData[PUSH, 
 	if err := i.initConfig(); err != nil {
 		i.loggers.initLogger.Error("init config failed :", err.Error())
 		return err
-	}	
+	}
+
+	if err := i.initCollectConnPool(data); err != nil {
+		i.loggers.initLogger.Error("init collect conn pool : ", err.Error())
+		return err
+	}
 
 	i.initQueue()
 	i.initThread(data)
@@ -119,7 +141,7 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) Init(data apptype.InitData[PUSH, 
 	return nil
 }
 
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) AsyncThreads(ctx context.Context) error {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) AsyncThreads(ctx context.Context) error {
 	go i.thread.intevalT.Run(ctx)
 	for _, t := range i.thread.pushT {
 		go t.Run(ctx)
@@ -134,7 +156,23 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) AsyncThreads(ctx context.Context)
 	return nil
 }
 
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) Run(ctx context.Context) error {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Close() error {
+	i.closer.collectLogCloser.Close()
+	i.closer.configDBCloser.Close()
+	i.closer.cronLogCloser.Close()
+	i.closer.initLogCloser.Close()
+	i.closer.intervalLogCloser.Close()
+	i.closer.pushLogCloser.Close()
+
+	i.closer.pushQCloser.Close()
+	i.closer.collectQCloser.Close()
+	i.closer.cronQCloser.Close()
+	
+	return nil
+}
+
+
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Run(ctx context.Context) error {
 	i.AsyncThreads(ctx)
 	
 	isStop := false
@@ -147,13 +185,11 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) Run(ctx context.Context) error {
 
 		time.Sleep(time.Second * 5)
 	}
-
-
 	return nil
 }
 
 // connectConfig implements Application.
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) connectConfig() error {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) connectConfig() error {
 	db, dbErr := sql.Open(i.setting.ConfigDb.Drvier, i.setting.ConfigDb.Dsn)
 	if dbErr != nil {
 		return dbErr
@@ -165,15 +201,29 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) connectConfig() error {
 	return dbErr
 }
 
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initCollectConnPool(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error {
+	p, err := data.GetConnPoolFn(
+		i.config.CollecbDbConfig.IP, 
+		i.config.CollecbDbConfig.Port, 
+		i.config.CollecbDbConfig.User, 
+		i.config.CollecbDbConfig.Password, 
+		i.config.CollecbDbConfig.Dbname)
+	if err != nil {
+		return err
+	}
+	i.collectConnPool = p
+	i.closer.collectConnPoolCloser = i.collectConnPool
+	return nil
+}
 // initConfig implements Application.
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) initConfig() error {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initConfig() error {
 	var err error
 	i.config,err = i.configDB.LoadConfig()
 	return err
 }
 
 // initLogger implements Application.
-func (i *implApplication[PUSH, FLAG, FLAGPTR]) initLogger() error {
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initLogger() error {
 	_, err := os.Stat(i.setting.LogConfig.Dir)
 	if os.IsNotExist(err) {
 		return err
@@ -262,6 +312,6 @@ func (i *implApplication[PUSH, FLAG, FLAGPTR]) initLogger() error {
 
 }
 
-func NewApplication[PUSH any, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]]() Application {
-	return &implApplication[PUSH, FLAG, FLAGPTR]{}
+func NewApplication[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]]() ApplicationInit[PUSH, CONN, FLAG, FLAGPTR] {
+	return &implApplication[PUSH, CONN, FLAG, FLAGPTR]{}
 }
