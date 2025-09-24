@@ -31,10 +31,12 @@ func main() {
 
 	applCtx, cancelCtxFn := context.WithCancel(context.Background())
 
-	if runErr := application.Run(applCtx); runErr != nil {
-		log.Println("Main - Server Run Error : ", runErr.Error())
-		return
-	}
+	go func() {
+		if runErr := application.Run(applCtx); runErr != nil {
+			log.Println("Main - Server Run Error : ", runErr.Error())
+			return
+		}
+	}()
 
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, syscall.SIGINT)

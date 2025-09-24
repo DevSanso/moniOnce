@@ -7,6 +7,6 @@ import (
 	"context"
 )
 
-func CollectSystemLocalhandle(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error){
+func CollectCQLSystemLocalhandle(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error){
 	return nil, nil
 }

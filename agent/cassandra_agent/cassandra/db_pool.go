@@ -25,11 +25,24 @@ func (cp *CassandraPool) GetDbConn(ctx context.Context) (*CassandraConn, error) 
 }
 
 type CassandraConn struct {
-	session *gocql.Session
+	cqlConfig *gocql.ClusterConfig
+	cqlSession *gocql.Session
 }
 
 func (cc *CassandraConn) Close() error {
-	cc.session.Close()
+	if cc.cqlSession != nil {
+		cc.cqlSession.Close()
+		cc.cqlSession = nil
+	}
+
+	return nil
+}
+
+func (cc *CassandraConn) ConnectNodeTool() error {
+	return nil
+}
+
+func (cc *CassandraConn) ConnectCQL() error {
 	return nil
 }
 

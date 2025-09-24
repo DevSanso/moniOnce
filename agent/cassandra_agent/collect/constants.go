@@ -7,5 +7,6 @@ import (
 )
 
 var CollectMapping = map[string]apptype.CollectFn[types.PushData, *cassandra.CassandraConn] {
-	"system_local" : CollectSystemLocalhandle,
+	"cql_system_local" : CollectCQLSystemLocalhandle,
+	"nodetool_tpstats" : CollectNodeToolTpStats,
 }
