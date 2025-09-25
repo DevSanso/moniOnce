@@ -38,12 +38,38 @@ func (cc *CassandraConn) Close() error {
 	return nil
 }
 
-func (cc *CassandraConn) ConnectNodeTool() error {
+func (cc *CassandraConn) ConnectCQL() error {
+	if cc.cqlSession != nil {
+		return fmt.Errorf("already new cqlSession")
+	}
+
+	session, sessErr := cc.cqlConfig.CreateSession()
+	if sessErr != nil {
+		return sessErr
+	}
+	cc.cqlSession = session
+
 	return nil
 }
 
-func (cc *CassandraConn) ConnectCQL() error {
-	return nil
+func (cc *CassandraConn) Query(ctx context.Context, query string, genFn func(scanFn func(...any) error) (any, error), args ...any) ([]any, error) {
+	q := cc.cqlSession.Query(query, args...)
+	iter := q.IterContext(ctx)
+	scanner := iter.Scanner()
+
+	ret := make([]any, 5)
+	
+	for scanner.Next() {
+		data, err := genFn(scanner.Scan)
+		if err != nil {
+			iter.Close()
+			return nil, err
+		}
+		ret = append(ret, data)
+	}
+	iter.Close()
+
+	return ret, nil
 }
 
 func (cp *CassandraPool) Close() error {

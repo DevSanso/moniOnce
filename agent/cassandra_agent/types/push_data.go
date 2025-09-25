@@ -3,13 +3,19 @@ package types
 import "cassandra_agent/types/dataframe"
 
 type PushData struct {
-	ConnType string
-	DataName string
+	ConnTypeId int
+	DataId int
 	
 	Nodetool struct {
 		TpStats struct {
 			Pool []dataframe.PoolMetrics
 			Latency []dataframe.LatencyMetrics
 		}
+
+		Info *dataframe.InfoMetrics
+	}
+
+	Cql struct {
+		TracesSession []dataframe.TracesSession
 	}
 }
