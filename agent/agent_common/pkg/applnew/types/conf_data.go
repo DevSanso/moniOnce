@@ -13,6 +13,14 @@ type ApplConfData struct {
 		Password string	
 		Dbname   string
 	}
+
+	DataPusherConfig struct {
+		IP string
+		Port int
+		User string
+		Password string	
+		Dbname   string
+	}
 	
 	Thread struct {
 		CollectCount int

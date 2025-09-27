@@ -32,6 +32,7 @@ type implApplication[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKey
 	config *apptype.ApplConfData
 
 	collectConnPool apptype.CollectConnPool[CONN]
+	dataPusher apptype.DataPusher[PUSH]
 
 	closer struct {
 		configDBCloser io.Closer
@@ -47,6 +48,7 @@ type implApplication[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKey
 		collectQCloser io.Closer
 
 		collectConnPoolCloser io.Closer
+		dataPusherCloser      io.Closer
 	}
 
 	queue struct {
@@ -108,7 +110,7 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initThread(data apptype.Ini
 	}
 	i.thread.pushT = make([]thread.PushThread[PUSH], 1)
 	for n := 0; n < i.config.Thread.PushCount; n++ {
-		t := thread.NewPushThread(i.queue.pushQ, i.loggers.pushLogger, data.DataPusher)
+		t := thread.NewPushThread(i.queue.pushQ, i.loggers.pushLogger, i.dataPusher)
 		i.thread.pushT = append(i.thread.pushT, t)
 	}
 }
@@ -129,9 +131,12 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Init(data apptype.InitData[
 		i.loggers.initLogger.Error("init config failed :", err.Error())
 		return err
 	}
-
 	if err := i.initCollectConnPool(data); err != nil {
 		i.loggers.initLogger.Error("init collect conn pool : ", err.Error())
+		return err
+	}
+	if err := i.initDataPusherPool(data); err != nil {
+		i.loggers.initLogger.Error("init data pusher conn pool : ", err.Error())
 		return err
 	}
 
@@ -167,6 +172,9 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Close() error {
 	i.closer.pushQCloser.Close()
 	i.closer.collectQCloser.Close()
 	i.closer.cronQCloser.Close()
+
+	i.closer.collectConnPoolCloser.Close()
+	i.closer.configDBCloser.Close()
 	
 	return nil
 }
@@ -213,6 +221,21 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initCollectConnPool(data ap
 	}
 	i.collectConnPool = p
 	i.closer.collectConnPoolCloser = i.collectConnPool
+	return nil
+}
+
+func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initDataPusherPool(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error {
+	p, err := data.GetPusherFn(
+		i.config.DataPusherConfig.IP, 
+		i.config.DataPusherConfig.Port, 
+		i.config.DataPusherConfig.User, 
+		i.config.DataPusherConfig.Password, 
+		i.config.DataPusherConfig.Dbname)
+	if err != nil {
+		return err
+	}
+	i.dataPusher = p
+	i.closer.dataPusherCloser = i.dataPusher
 	return nil
 }
 // initConfig implements Application.

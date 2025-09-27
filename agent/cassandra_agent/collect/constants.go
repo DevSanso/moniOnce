@@ -7,10 +7,12 @@ import (
 )
 
 var CollectMapping = map[string]apptype.CollectFn[types.PushData, *cassandra.CassandraConn] {
-	"cql_system_local" : CollectCQLSystemLocalhandle,
-	"nodetool_tpstats" : CollectNodeToolTpStats,
-	"nodetool_info"    : CollectNodeToolInfo,
-	"cql_system_traces_sessions" : CollectCQLSystemTracesSessions,
+	"collect.nodetool.tpstats" : CollectNodeToolTpStats,
+	"collect.nodetool.info"    : CollectNodeToolInfo,
+	"collect.cql.trace_session" : CollectCQLSystemTracesSessions,
+	"collect.cql.running_query"    : CollectCQLSystemViewRunningQuery,
+	"collect.agent.host_cpu" : CollectAgentHostCpu,
+	"collect.agent.host_mem" : CollectAgentHostMem,
 }
 
 const (
@@ -19,4 +21,6 @@ const (
 		" FROM system_traces.sessions " +
 		" WHERE started_at > toTimestamp(now()) - 1000 * 60 " +
 		" ALLOW FILTERING "
+	
+	_CqlSystemViewQueriesQuery = " select thread_id, queued_micros, running_micros, task from system_views.queries "
 )

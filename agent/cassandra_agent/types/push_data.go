@@ -17,5 +17,11 @@ type PushData struct {
 
 	Cql struct {
 		TracesSession []dataframe.TracesSession
+		RunningQuery  []dataframe.SystemViewQueries
+	}
+
+	Agent struct {
+		CpuPercent    dataframe.AgentHostCpuPercent
+		Memory        dataframe.AgentHostMemory
 	}
 }

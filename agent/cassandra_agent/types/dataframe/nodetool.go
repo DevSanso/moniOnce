@@ -8,58 +8,39 @@ import (
 	"strings"
 )
 
-type PoolMetrics struct {
-	PoolName       string `agent_common_parser:"0,string"`
-	Active         int `agent_common_parser:"1,int"`
-	Pending        int `agent_common_parser:"2,int"`
-	Completed      int `agent_common_parser:"3,int"`
-	Blocked        int `agent_common_parser:"4,int"`
-	AllTimeBlocked int `agent_common_parser:"5,int"`
-}
-
 type LatencyMetrics struct {
-	MessageType      string `agent_common_parser:"0,string"`
-	Dropped          int `agent_common_parser:"1,int"`
+	MessageType      string  `agent_common_parser:"0,string"`
+	Dropped          int     `agent_common_parser:"1,int"`
 	Latency50Percent float64 `agent_common_parser:"2,float64"`
 	Latency95Percent float64 `agent_common_parser:"3,float64"`
 	Latency99Percent float64 `agent_common_parser:"4,float64"`
 	LatencyMax       float64 `agent_common_parser:"5,float64"`
 }
 
-type InfoMetricsCache struct {
-	Entries int
-	SizeByte  int64
-	CapacityByte int64
-	Hits         int
-	Requests     int
-	HitRate      float64
-	SavePeriodInSecond int
-	OverflowSizeByte   int64
-}
 type InfoMetrics struct {
-	ID string
-	IsGossipActive bool
+	ID                      string
+	IsGossipActive          bool
 	IsNativeTransportActive bool
-	LoadKb float64
-	UncompressedLoadKb float64
-	GenerationNo int64
-	Uptime       int64
-	HeapMemUsageMB float64
-	HeapMemTotalMB float64
-	OffHeapMemMB   float64
-	DataCenter     string
-	Rack           string
-	Exceptions     int
-	Key            InfoMetricsCache
-	Row            InfoMetricsCache
-	Counter        InfoMetricsCache
-	Network        InfoMetricsCache
-	RepairedPercent int
-	BootstrapState string
+	LoadKb                  float64
+	UncompressedLoadKb      float64
+	GenerationNo            int64
+	Uptime                  int64
+	HeapMemUsageMB          float64
+	HeapMemTotalMB          float64
+	OffHeapMemMB            float64
+	DataCenter              string
+	Rack                    string
+	Exceptions              int
+	Key                     CacheMetric
+	Row                     CacheMetric
+	Counter                 CacheMetric
+	Network                 CacheMetric
+	RepairedPercent         int
+	BootstrapState          string
 }
 
 var (
-	poolMetricParser = parser.CreateLinePaser[PoolMetrics](" ")
+	poolMetricParser    = parser.CreateLinePaser[PoolMetrics](" ")
 	latencyMetricParser = parser.CreateLinePaser[LatencyMetrics](" ")
 )
 
@@ -91,7 +72,7 @@ func ParsePoolMetrics(data string, poolMetricsArray []PoolMetrics) error {
 	if maxLen := countPoolMetrics(data); maxLen > len(poolMetricsArray) {
 		poolMetricsArray = nil
 		poolMetricsArray = make([]PoolMetrics, maxLen)
-	} 
+	}
 
 	lines := strings.Split(data, "\n")
 	poolIndex := 0
@@ -111,7 +92,7 @@ func ParseLatencyMetrics(data string, latencyMetricsArray []LatencyMetrics) erro
 	if maxLen := countLatencyMetrics(data); maxLen > len(latencyMetricsArray) {
 		latencyMetricsArray = nil
 		latencyMetricsArray = make([]LatencyMetrics, maxLen)
-	} 
+	}
 
 	lines := strings.Split(data, "\n")
 	latencyIndex := 0
@@ -127,9 +108,9 @@ func ParseLatencyMetrics(data string, latencyMetricsArray []LatencyMetrics) erro
 	return nil
 }
 
-func parseCacheLine(value string) InfoMetricsCache {
+func parseCacheLine(value string) CacheMetric {
 	fields := strings.Split(value, ",")
-	cache := InfoMetricsCache{}
+	cache := CacheMetric{}
 	for _, f := range fields {
 		f = strings.TrimSpace(f)
 		if strings.HasPrefix(f, "entries ") {
@@ -155,7 +136,7 @@ func parseCacheLine(value string) InfoMetricsCache {
 	return cache
 }
 
-func ParseInfoMetrics(data string, info *InfoMetrics) (error) {
+func ParseInfoMetrics(data string, info *InfoMetrics) error {
 	ret := info
 	lines := strings.Split(data, "\n")
 

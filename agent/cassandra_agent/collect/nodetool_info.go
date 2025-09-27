@@ -19,7 +19,7 @@ func CollectNodeToolInfo(ctx context.Context, ctl *cassandra.CassandraConn, log 
 	
 	stdout.Grow(2048)
 
-	cmd := exec.Command("nodetool", "tpstats")
+	cmd := exec.Command("nodetool", "info")
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 

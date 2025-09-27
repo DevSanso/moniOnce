@@ -13,6 +13,8 @@ type CollectFn[PUSH any, CONN io.Closer] func(context.Context, CONN, logger.Leve
 
 type DataPusher[PUSH any] interface {
 	Push(*PUSH, context.Context, logger.LevelLogger) error
+	io.Closer
 }
 
 type GenCollectConnPoolFn[CONN io.Closer] func(IP string, Port int, User string, Password string,Dbname string, args ...any) (CollectConnPool[CONN], error)
+type GenPusherFn[PUSH any] func(IP string, Port int, User string, Password string,Dbname string, args ...any) (DataPusher[PUSH], error)

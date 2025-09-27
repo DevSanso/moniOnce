@@ -1,8 +1,14 @@
 package types
 
-type FlagData struct {
-	
-}
+import (
+
+)
+
+type FlagData struct {}
+
+type FlagDataKey string
+
+
 
 func (fd *FlagData)Set(key string, val string) error {
 	return nil

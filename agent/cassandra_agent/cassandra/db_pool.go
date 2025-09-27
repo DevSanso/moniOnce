@@ -52,24 +52,26 @@ func (cc *CassandraConn) ConnectCQL() error {
 	return nil
 }
 
-func (cc *CassandraConn) Query(ctx context.Context, query string, genFn func(scanFn func(...any) error) (any, error), args ...any) ([]any, error) {
+func CassandraConnRunQuery[T any](cc *CassandraConn, ctx context.Context, query string, cap int, 
+	genFn func(p *T, scanFn func(...any) error) error, args ...any) ([]T, error){
 	q := cc.cqlSession.Query(query, args...)
 	iter := q.IterContext(ctx)
 	scanner := iter.Scanner()
 
-	ret := make([]any, 5)
-	
+	rows := make([]T, 0, cap)
 	for scanner.Next() {
-		data, err := genFn(scanner.Scan)
+		var row T
+		err := genFn(&row, scanner.Scan)
 		if err != nil {
 			iter.Close()
 			return nil, err
 		}
-		ret = append(ret, data)
+
+		rows = append(rows, row)
 	}
 	iter.Close()
 
-	return ret, nil
+	return rows, nil
 }
 
 func (cp *CassandraPool) Close() error {

@@ -12,6 +12,7 @@ import (
 
 	"cassandra_agent/cassandra"
 	"cassandra_agent/collect"
+	"cassandra_agent/pusher"
 	agenttype "cassandra_agent/types"
 )
 
@@ -21,7 +22,7 @@ func main() {
 
 	application := applnew.NewApplication[agenttype.PushData, *cassandra.CassandraConn, agenttype.FlagData]()
 	err := application.Init(appltype.InitData[agenttype.PushData, *cassandra.CassandraConn, agenttype.FlagData, *agenttype.FlagData]{
-		SettingPath: args.configPath, CollectM: collect.CollectMapping, CronM: nil, DataPusher: nil, GetConnPoolFn: cassandra.NewCassandraPool,
+		SettingPath: args.configPath, CollectM: collect.CollectMapping, CronM: nil, GetPusherFn: pusher.NewScyllaDbPusher, GetConnPoolFn: cassandra.NewCassandraPool,
 	})
 
 	if err != nil {
