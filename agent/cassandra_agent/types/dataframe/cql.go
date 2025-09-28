@@ -19,3 +19,13 @@ type SystemViewQueries struct {
 	RunningMicroSec uint64
 	Text string
 }
+
+type SystemViewClients struct {
+	Address string
+	DriverName string
+	ConnectionStage string
+	Hostname string
+	RequestCnt int64
+	Keyspace string
+	Username string
+}

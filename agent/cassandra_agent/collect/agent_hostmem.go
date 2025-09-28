@@ -8,9 +8,10 @@ import (
 	"cassandra_agent/types"
 	"cassandra_agent/types/dataframe"
 	"context"
+	"time"
 )
 
-func CollectAgentHostMem(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error){
+func collectAgentHostMem(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error) {
 	stat, statErr := host.NewHostMemoryCollector().HostMemory()
 
 	if statErr != nil {
@@ -19,9 +20,10 @@ func CollectAgentHostMem(ctx context.Context, ctl *cassandra.CassandraConn, log 
 	}
 
 	pushData := new(types.PushData)
+	pushData.NowTimeUnixEpoch = time.Now().Unix()
 	pushData.ConnTypeId = int(constants.ConnTypeAgent)
 	pushData.DataId = int(constants.AgentHostMemory)
-	pushData.Agent.Memory = dataframe.AgentHostMemory(stat)
+	pushData.Host.Memory = dataframe.HostMemory(stat)
 
-	return pushData, nil	
+	return pushData, nil
 }

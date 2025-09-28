@@ -12,12 +12,13 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
-func CollectNodeToolTpStats(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error){
+func collectNodetoolTpStats(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error) {
 	stdout := bytes.Buffer{}
 	stderr := bytes.Buffer{}
-	
+
 	stdout.Grow(2048)
 
 	cmd := exec.Command("nodetool", "tpstats")
@@ -40,17 +41,16 @@ func CollectNodeToolTpStats(ctx context.Context, ctl *cassandra.CassandraConn, l
 	parts := strings.Split(stdout.String(), "\n\n")
 	if len(parts) >= 2 {
 		poolData = parts[0]
-		LatencyData =  parts[1]
+		LatencyData = parts[1]
 	}
 
-	cache := cache.NodetoolTpStatMemoryPool.Get().(struct{
-				l []dataframe.LatencyMetrics;
-				p []dataframe.PoolMetrics
-	});
+	cache := cache.NodetoolTpStatMemoryPool.Get().(struct {
+		l []dataframe.LatencyMetrics
+		p []dataframe.PoolMetrics
+	})
 
 	poolMetric := cache.p
 	latencyMetric := cache.l
-
 
 	poolErr := dataframe.ParsePoolMetrics(poolData, poolMetric)
 	if poolErr != nil {
@@ -63,11 +63,12 @@ func CollectNodeToolTpStats(ctx context.Context, ctl *cassandra.CassandraConn, l
 		return nil, latencyErr
 	}
 
-	ret := new(types.PushData)
-	ret.ConnTypeId = int(constants.ConnTypeNodeTool)
-	ret.DataId = int(constants.NodeToolTpStatsData)
-	ret.Nodetool.TpStats.Pool = poolMetric
-	ret.Nodetool.TpStats.Latency = latencyMetric
+	pushData := new(types.PushData)
+	pushData.NowTimeUnixEpoch = time.Now().Unix()
+	pushData.ConnTypeId = int(constants.ConnTypeNodeTool)
+	pushData.DataId = int(constants.NodeToolTpStatsData)
+	pushData.Nodetool.TpStats.Pool = poolMetric
+	pushData.Nodetool.TpStats.Latency = latencyMetric
 
-	return ret, nil
+	return pushData, nil
 }

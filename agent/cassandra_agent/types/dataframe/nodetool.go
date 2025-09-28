@@ -8,15 +8,6 @@ import (
 	"strings"
 )
 
-type LatencyMetrics struct {
-	MessageType      string  `agent_common_parser:"0,string"`
-	Dropped          int     `agent_common_parser:"1,int"`
-	Latency50Percent float64 `agent_common_parser:"2,float64"`
-	Latency95Percent float64 `agent_common_parser:"3,float64"`
-	Latency99Percent float64 `agent_common_parser:"4,float64"`
-	LatencyMax       float64 `agent_common_parser:"5,float64"`
-}
-
 type InfoMetrics struct {
 	ID                      string
 	IsGossipActive          bool

@@ -13,6 +13,7 @@ const (
 	NodeToolInfoData
 	CQLTracesSessions
 	CQLRunningQuerys
+	CQLClients
 	AgentHostCpu
 	AgentHostMemory
 )

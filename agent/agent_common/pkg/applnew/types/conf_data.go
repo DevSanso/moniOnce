@@ -7,19 +7,11 @@ import (
 
 type ApplConfData struct {
 	CollecbDbConfig struct {
-		IP string
-		Port int
-		User string
-		Password string	
-		Dbname   string
+		Url string
 	}
 
 	DataPusherConfig struct {
-		IP string
-		Port int
-		User string
-		Password string	
-		Dbname   string
+		Url string
 	}
 	
 	Thread struct {
@@ -36,58 +28,48 @@ type ApplConfData struct {
 }
 
 func(aac *ApplConfData)Set(key string, value string) error {
-	if strings.Index(key, "application_") == 0 {
+	if strings.Index(key, "application.") == 0 {
 		switch key {
-		case "collectDBIP":
-			aac.CollecbDbConfig.IP = value
-		case "collectDBPort":
-			p, err := strconv.Atoi(value)
-			if err != nil {
-				return err
-			}
-			aac.CollecbDbConfig.Port = p
-		case "collectDBUser":
-			aac.CollecbDbConfig.User = value
-		case "collectDBPasswd":
-			aac.CollecbDbConfig.Password = value
-		case "collectDBDbname":
-			aac.CollecbDbConfig.Dbname = value
-		case "threadCollectCount":
+		case "collect.db.url":
+			aac.CollecbDbConfig.Url = value
+		case "thread.collectCount":
 			p, err := strconv.Atoi(value)
 			if err != nil {
 				return err
 			}
 			aac.Thread.CollectCount = p
-		case "threadPushCount":
+		case "thread.pushCount":
 			p, err := strconv.Atoi(value)
 			if err != nil {
 				return err
 			}
 			aac.Thread.PushCount = p
-		case "threadCronCount":
+		case "thread.cronCount":
 			p, err := strconv.Atoi(value)
 			if err != nil {
 				return err
 			}
 			aac.Thread.PushCount = p
-		case "queueCollectSize":
+		case "queue.collectSize":
 			p, err := strconv.Atoi(value)
 			if err != nil {
 				return err
 			}
 			aac.Queue.CollectSize = p
-		case "queuePushSize":
+		case "queue.pushSize":
 			p, err := strconv.Atoi(value)
 			if err != nil {
 				return err
 			}
 			aac.Queue.PushSize = p
-		case "queueCronSize":
+		case "queue.cronSize":
 			p, err := strconv.Atoi(value)
 			if err != nil {
 				return err
 			}
 			aac.Queue.PushSize = p
+		case "dataPusher.conn.url":
+			aac.DataPusherConfig.Url = value
 		}
 	}
 

@@ -1,14 +1,18 @@
 package types
 
-import "cassandra_agent/types/dataframe"
+import (
+	"cassandra_agent/types/dataframe"
+)
 
 type PushData struct {
 	ConnTypeId int
-	DataId int
-	
+	DataId     int
+
+	NowTimeUnixEpoch int64    
+
 	Nodetool struct {
 		TpStats struct {
-			Pool []dataframe.PoolMetrics
+			Pool    []dataframe.PoolMetrics
 			Latency []dataframe.LatencyMetrics
 		}
 
@@ -18,10 +22,11 @@ type PushData struct {
 	Cql struct {
 		TracesSession []dataframe.TracesSession
 		RunningQuery  []dataframe.SystemViewQueries
+		Clients       []dataframe.SystemViewClients
 	}
 
-	Agent struct {
-		CpuPercent    dataframe.AgentHostCpuPercent
-		Memory        dataframe.AgentHostMemory
+	Host struct {
+		CpuPercent dataframe.HostCpuPercent
+		Memory     dataframe.HostMemory
 	}
 }

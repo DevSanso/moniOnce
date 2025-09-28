@@ -16,5 +16,5 @@ type DataPusher[PUSH any] interface {
 	io.Closer
 }
 
-type GenCollectConnPoolFn[CONN io.Closer] func(IP string, Port int, User string, Password string,Dbname string, args ...any) (CollectConnPool[CONN], error)
-type GenPusherFn[PUSH any] func(IP string, Port int, User string, Password string,Dbname string, args ...any) (DataPusher[PUSH], error)
+type GenCollectConnPoolFn[CONN io.Closer] func(url string, args ...any) (CollectConnPool[CONN], error)
+type GenPusherFn[PUSH any] func(url string, args ...any) (DataPusher[PUSH], error)

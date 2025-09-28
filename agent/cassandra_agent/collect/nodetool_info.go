@@ -11,12 +11,13 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"time"
 )
 
-func CollectNodeToolInfo(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error){
+func collectNodeToolInfo(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error) {
 	stdout := bytes.Buffer{}
 	stderr := bytes.Buffer{}
-	
+
 	stdout.Grow(2048)
 
 	cmd := exec.Command("nodetool", "info")
@@ -33,17 +34,18 @@ func CollectNodeToolInfo(ctx context.Context, ctl *cassandra.CassandraConn, log 
 		return nil, fmt.Errorf("%s", cmdErr)
 	}
 	data := cache.NodetoolInfoMemoryPool.Get().(*dataframe.InfoMetrics)
-	
+
 	parserErr := dataframe.ParseInfoMetrics(stdout.String(), data)
 	if parserErr != nil {
 		log.Error(parserErr.Error())
 		return nil, fmt.Errorf("%s", parserErr)
 	}
 
-	ret := new(types.PushData)
-	ret.ConnTypeId = int(constants.ConnTypeNodeTool)
-	ret.DataId = int(constants.NodeToolInfoData)
-	ret.Nodetool.Info = data
+	pushData := new(types.PushData)
+	pushData.NowTimeUnixEpoch = time.Now().Unix()
+	pushData.ConnTypeId = int(constants.ConnTypeNodeTool)
+	pushData.DataId = int(constants.NodeToolInfoData)
+	pushData.Nodetool.Info = data
 
-	return ret, nil
+	return pushData, nil
 }

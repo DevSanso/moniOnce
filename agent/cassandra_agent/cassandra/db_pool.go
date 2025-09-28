@@ -4,6 +4,7 @@ import (
 	apptype "agent_common/pkg/applnew/types"
 	"context"
 	"fmt"
+	"net/url"
 
 	gocql "github.com/apache/cassandra-gocql-driver/v2"
 )
@@ -38,9 +39,9 @@ func (cc *CassandraConn) Close() error {
 	return nil
 }
 
-func (cc *CassandraConn) ConnectCQL() error {
+func (cc *CassandraConn) connectCQL() error {
 	if cc.cqlSession != nil {
-		return fmt.Errorf("already new cqlSession")
+		return nil
 	}
 
 	session, sessErr := cc.cqlConfig.CreateSession()
@@ -52,8 +53,23 @@ func (cc *CassandraConn) ConnectCQL() error {
 	return nil
 }
 
-func CassandraConnRunQuery[T any](cc *CassandraConn, ctx context.Context, query string, cap int, 
-	genFn func(p *T, scanFn func(...any) error) error, args ...any) ([]T, error){
+func (cc *CassandraConn) Exec(ctx context.Context, query string, args ...any) error {
+	if err := cc.connectCQL(); err != nil {
+		return err
+	}
+
+	q := cc.cqlSession.Query(query, args...)
+	if err := q.ExecContext(ctx); err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+func CassandraConnRunQuery[T any](cc *CassandraConn, ctx context.Context, query string, cap int, genFn func(p *T, scanFn func(...any) error) error, args ...any) ([]T, error){
+	if err := cc.connectCQL(); err != nil {
+		return nil, err
+	}
 	q := cc.cqlSession.Query(query, args...)
 	iter := q.IterContext(ctx)
 	scanner := iter.Scanner()
@@ -78,13 +94,28 @@ func (cp *CassandraPool) Close() error {
 	return nil
 }
 
-func NewCassandraPool(IP string, Port int, User string, Password string, Dbname string, args ...any) (apptype.CollectConnPool[*CassandraConn], error) {
-	cconf := gocql.NewCluster(fmt.Sprintf("%s:%d", IP, Port))
-	password := gocql.PasswordAuthenticator{
-		Username: User,
-		Password: Password,
+func NewCassandraPool(dbUrl string, args ...any) (apptype.CollectConnPool[*CassandraConn], error) {
+	url, err := url.Parse(dbUrl)
+	if err != nil {
+		return nil, err
 	}
-	cconf.Keyspace = Dbname
+	if url.Scheme != "cassandra_agent" {
+		return nil, fmt.Errorf("not support schema : %s", url.Scheme)
+	}
+
+	ip := url.Host
+	port := url.Port()
+
+	user := url.User.Username()
+	passwd,_ := url.User.Password()
+	dbname := url.Path
+
+	cconf := gocql.NewCluster(fmt.Sprintf("%s:%s", ip, port))
+	password := gocql.PasswordAuthenticator{
+		Username: user,
+		Password: passwd,
+	}
+	cconf.Keyspace = dbname
 	cconf.Authenticator = password
 
 	cp := &CassandraPool{

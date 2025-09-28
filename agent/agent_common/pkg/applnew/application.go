@@ -210,12 +210,7 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) connectConfig() error {
 }
 
 func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initCollectConnPool(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error {
-	p, err := data.GetConnPoolFn(
-		i.config.CollecbDbConfig.IP, 
-		i.config.CollecbDbConfig.Port, 
-		i.config.CollecbDbConfig.User, 
-		i.config.CollecbDbConfig.Password, 
-		i.config.CollecbDbConfig.Dbname)
+	p, err := data.GetConnPoolFn(i.config.CollecbDbConfig.Url)
 	if err != nil {
 		return err
 	}
@@ -225,12 +220,7 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initCollectConnPool(data ap
 }
 
 func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initDataPusherPool(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error {
-	p, err := data.GetPusherFn(
-		i.config.DataPusherConfig.IP, 
-		i.config.DataPusherConfig.Port, 
-		i.config.DataPusherConfig.User, 
-		i.config.DataPusherConfig.Password, 
-		i.config.DataPusherConfig.Dbname)
+	p, err := data.GetPusherFn(i.config.DataPusherConfig.Url)
 	if err != nil {
 		return err
 	}
