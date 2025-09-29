@@ -22,29 +22,29 @@ type Application interface {
 }
 
 type ApplicationInit[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] interface {
-	Init(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error 
+	Init(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error
 	Application
 }
 
 type implApplication[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
-	setting apptype.SettingData
-	configDB loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, * apptype.AppSyncData, FLAGPTR]
-	config *apptype.ApplConfData
+	setting  apptype.SettingData
+	configDB loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, *apptype.AppSyncData, FLAGPTR]
+	config   *apptype.ApplConfData
 
 	collectConnPool apptype.CollectConnPool[CONN]
-	dataPusher apptype.DataPusher[PUSH]
+	dataPusher      apptype.DataPusher[PUSH]
 
 	closer struct {
 		configDBCloser io.Closer
 
-		cronLogCloser  io.Closer
+		cronLogCloser     io.Closer
 		collectLogCloser  io.Closer
-		pushLogCloser  io.Closer
-		intervalLogCloser  io.Closer
-		initLogCloser  io.Closer
+		pushLogCloser     io.Closer
+		intervalLogCloser io.Closer
+		initLogCloser     io.Closer
 
-		cronQCloser io.Closer
-		pushQCloser io.Closer
+		cronQCloser    io.Closer
+		pushQCloser    io.Closer
 		collectQCloser io.Closer
 
 		collectConnPoolCloser io.Closer
@@ -52,24 +52,24 @@ type implApplication[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKey
 	}
 
 	queue struct {
-		cronQ types.Queue[string]
-		pushQ types.Queue[*PUSH]
-		collectQ types.Queue[string]
+		cronQ    types.Queue[apptype.IntervalData]
+		pushQ    types.Queue[*PUSH]
+		collectQ types.Queue[apptype.IntervalData]
 	}
 
 	thread struct {
 		collectT []thread.CollectThread[PUSH, CONN]
-		cronT    []thread.CronThread[PUSH,FLAG,FLAGPTR]
+		cronT    []thread.CronThread[PUSH, FLAG, FLAGPTR]
 		pushT    []thread.PushThread[PUSH]
-		intevalT thread.IntervalThread[FLAG,FLAGPTR]
+		intevalT thread.IntervalThread[FLAG, FLAGPTR]
 	}
 
 	loggers struct {
-		initLogger logger.LevelLogger
-		collectLogger logger.LevelLogger
-		pushLogger logger.LevelLogger
+		initLogger     logger.LevelLogger
+		collectLogger  logger.LevelLogger
+		pushLogger     logger.LevelLogger
 		intervalLogger logger.LevelLogger
-		cronLogger logger.LevelLogger
+		cronLogger     logger.LevelLogger
 	}
 }
 
@@ -85,10 +85,9 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initSetting(settingPath str
 	return nil
 }
 
-
 func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initQueue() {
-	i.queue.collectQ = collection.NewStdQueue[string](i.config.Queue.CollectSize)
-	i.queue.cronQ = collection.NewStdQueue[string](i.config.Queue.CollectSize)
+	i.queue.collectQ = collection.NewStdQueue[apptype.IntervalData](i.config.Queue.CollectSize)
+	i.queue.cronQ = collection.NewStdQueue[apptype.IntervalData](i.config.Queue.CollectSize)
 	i.queue.pushQ = collection.NewStdQueue[*PUSH](i.config.Queue.CollectSize)
 
 	i.closer.collectQCloser = i.queue.collectQ
@@ -105,7 +104,7 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initThread(data apptype.Ini
 	}
 	i.thread.collectT = make([]thread.CollectThread[PUSH, CONN], 1)
 	for n := 0; n < i.config.Thread.CollectCount; n++ {
-		t := thread.NewCollectThread(i.queue.cronQ, i.collectConnPool, i.queue.pushQ, data.CollectM, i.loggers.collectLogger)
+		t := thread.NewCollectThread(i.queue.collectQ, i.collectConnPool, i.queue.pushQ, data.CollectM, i.loggers.collectLogger)
 		i.thread.collectT = append(i.thread.collectT, t)
 	}
 	i.thread.pushT = make([]thread.PushThread[PUSH], 1)
@@ -115,7 +114,6 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initThread(data apptype.Ini
 	}
 }
 
-
 func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Init(data apptype.InitData[PUSH, CONN, FLAG, FLAGPTR]) error {
 	if err := i.initSetting(data.SettingPath); err != nil {
 		return err
@@ -123,40 +121,51 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Init(data apptype.InitData[
 	if err := i.initLogger(); err != nil {
 		return err
 	}
+	i.loggers.initLogger.Debug("init logger done")
 	if err := i.connectConfig(); err != nil {
 		i.loggers.initLogger.Error("connect config db failed :", err.Error())
 		return err
 	}
+	i.loggers.initLogger.Debug("config db connect done")
 	if err := i.initConfig(); err != nil {
 		i.loggers.initLogger.Error("init config failed :", err.Error())
 		return err
 	}
+	i.loggers.initLogger.Debug("read config db done")
 	if err := i.initCollectConnPool(data); err != nil {
 		i.loggers.initLogger.Error("init collect conn pool : ", err.Error())
 		return err
 	}
+	i.loggers.initLogger.Debug("init monitoring db pool done")
 	if err := i.initDataPusherPool(data); err != nil {
 		i.loggers.initLogger.Error("init data pusher conn pool : ", err.Error())
 		return err
 	}
+	i.loggers.initLogger.Debug("init push database connection done")
 
 	i.initQueue()
+	i.loggers.initLogger.Debug("init queue done")
 	i.initThread(data)
+	i.loggers.initLogger.Debug("init thread done")
 
 	return nil
 }
 
 func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) AsyncThreads(ctx context.Context) error {
 	go i.thread.intevalT.Run(ctx)
+	i.loggers.initLogger.Debug("start interval thread")
 	for _, t := range i.thread.pushT {
 		go t.Run(ctx)
 	}
+	i.loggers.initLogger.Debug("start push thread:%d", len(i.thread.pushT))
 	for _, t := range i.thread.collectT {
 		go t.Run(ctx)
 	}
+	i.loggers.initLogger.Debug("start collect thread:%d", len(i.thread.collectT))
 	for _, t := range i.thread.cronT {
 		go t.Run(ctx)
 	}
+	i.loggers.initLogger.Debug("start cron thread:%d", len(i.thread.cronT))
 
 	return nil
 }
@@ -175,14 +184,14 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Close() error {
 
 	i.closer.collectConnPoolCloser.Close()
 	i.closer.configDBCloser.Close()
-	
+
 	return nil
 }
 
-
 func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Run(ctx context.Context) error {
+	i.loggers.initLogger.Info("startup application")
 	i.AsyncThreads(ctx)
-	
+
 	isStop := false
 	for !isStop {
 		select {
@@ -203,7 +212,7 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) connectConfig() error {
 		return dbErr
 	}
 	i.closer.configDBCloser = db
-	i.configDB = loader.NewSQLConfigure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, * apptype.AppSyncData, FLAGPTR](
+	i.configDB = loader.NewSQLConfigure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, *apptype.AppSyncData, FLAGPTR](
 		db, i.setting.ObjectId, i.loggers.initLogger)
 
 	return dbErr
@@ -228,10 +237,11 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initDataPusherPool(data app
 	i.closer.dataPusherCloser = i.dataPusher
 	return nil
 }
+
 // initConfig implements Application.
 func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initConfig() error {
 	var err error
-	i.config,err = i.configDB.LoadConfig()
+	i.config, err = i.configDB.LoadConfig()
 	return err
 }
 
@@ -246,7 +256,7 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initLogger() error {
 	const collectName = "collect.log"
 	const pushName = "push.log"
 	const intervalName = "interval.log"
-	const initName     = "init.log"
+	const initName = "init.log"
 
 	var cronWriter io.WriteCloser = nil
 	var collectWriter io.WriteCloser = nil

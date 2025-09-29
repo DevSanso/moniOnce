@@ -1,4 +1,4 @@
-CREATE TABLE msca_jvm_host_data (
+CREATE TABLE msca_host_cpu_data (
     object_id bigint,
     collect_time timestamp,
     sys float,

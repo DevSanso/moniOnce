@@ -31,6 +31,8 @@ func (sdp *scyllaDbPusher) Push(data *types.PushData, ctx context.Context, log l
 	
 	var pushErr error = nil 
 
+	log.Debug("try push data conn_id:%d, data_id:%d", data.ConnTypeId, data.DataId);
+
 	switch constants.DataID(data.DataId) {
 	case constants.AgentHostCpu:
 		pushErr = pushHostCpu(ctx, conn, &data.Host.CpuPercent)

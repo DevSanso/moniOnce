@@ -12,10 +12,10 @@ import (
 
 type IntervalThread[FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
 	intervalLogger logger.LevelLogger
-	confLoader loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, *apptype.AppSyncData, FLAGPTR]
+	confLoader     loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, *apptype.AppSyncData, FLAGPTR]
 
-	collectSend    types.Pusher[string]
-	cronSend     types.Pusher[string]
+	collectSend types.Pusher[apptype.IntervalData]
+	cronSend    types.Pusher[apptype.IntervalData]
 
 	intervals map[string]int
 	crons     map[string]int
@@ -24,24 +24,24 @@ type IntervalThread[FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
 }
 
 func NewIntervalThread[FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]](
-	logger logger.LevelLogger, 
+	logger logger.LevelLogger,
 	confLoader loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, *apptype.AppSyncData, FLAGPTR],
-	collectSend    types.Pusher[string],
-	cronSend     types.Pusher[string]) IntervalThread[FLAG, FLAGPTR] {
-	
+	collectSend types.Pusher[apptype.IntervalData],
+	cronSend types.Pusher[apptype.IntervalData]) IntervalThread[FLAG, FLAGPTR] {
+
 	return IntervalThread[FLAG, FLAGPTR]{
 		intervalLogger: logger,
-		confLoader: confLoader,
-		collectSend: collectSend,
-		cronSend: cronSend,
+		confLoader:     confLoader,
+		collectSend:    collectSend,
+		cronSend:       cronSend,
 
-		intervals: make(map[string]int),
-		crons : make(map[string]int),
+		intervals:            make(map[string]int),
+		crons:                make(map[string]int),
 		isCollectAndCronStop: false,
 	}
 }
 
-func(it *IntervalThread[FLAG, FLAGPTR])syncSetting() error {
+func (it *IntervalThread[FLAG, FLAGPTR]) syncSetting() error {
 	syncData, syncErr := it.confLoader.LoadSync()
 	if syncErr != nil {
 		return syncErr
@@ -54,9 +54,9 @@ func(it *IntervalThread[FLAG, FLAGPTR])syncSetting() error {
 	return nil
 }
 
-func(it *IntervalThread[FLAG, FLAGPTR])Run(ctx context.Context) error {
+func (it *IntervalThread[FLAG, FLAGPTR]) Run(ctx context.Context) error {
 	isStop := false
-	oldMin := 0 
+	oldMin := 0
 	oldStopSync := false
 
 	for !isStop {
@@ -70,7 +70,7 @@ func(it *IntervalThread[FLAG, FLAGPTR])Run(ctx context.Context) error {
 			}
 
 			if it.isCollectAndCronStop {
-				if it.isCollectAndCronStop != oldStopSync{
+				if it.isCollectAndCronStop != oldStopSync {
 					it.intervalLogger.Info("reset stop agent")
 				}
 
@@ -78,24 +78,24 @@ func(it *IntervalThread[FLAG, FLAGPTR])Run(ctx context.Context) error {
 				time.Sleep(1 * time.Second)
 				continue
 			} else {
-				if it.isCollectAndCronStop != oldStopSync{
+				if it.isCollectAndCronStop != oldStopSync {
 					it.intervalLogger.Info("reset start agent")
 				}
 				oldStopSync = it.isCollectAndCronStop
 			}
-			
+
 			it.intervalLogger.Debug("sync interval")
 		}
 
 		for name, interval := range it.intervals {
-			if nowSec % interval == 0 {
-				it.collectSend.Push(name)
+			if nowSec%interval == 0 {
+				it.collectSend.Push(apptype.IntervalData{Name: name, Interval: interval})
 			}
 		}
 
 		for name, interval := range it.crons {
-			if nowSec % interval == 0 {
-				it.cronSend.Push(name)
+			if nowSec%interval == 0 {
+				it.cronSend.Push(apptype.IntervalData{Name: name, Interval: interval})
 			}
 		}
 
@@ -109,5 +109,5 @@ func(it *IntervalThread[FLAG, FLAGPTR])Run(ctx context.Context) error {
 	}
 
 	return nil
-	
+
 }

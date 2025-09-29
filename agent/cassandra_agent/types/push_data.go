@@ -23,6 +23,7 @@ type PushData struct {
 		TracesSession []dataframe.TracesSession
 		RunningQuery  []dataframe.SystemViewQueries
 		Clients       []dataframe.SystemViewClients
+		SystemLogs    []dataframe.SystemViewSystemLog
 	}
 
 	Host struct {

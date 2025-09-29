@@ -29,3 +29,10 @@ type SystemViewClients struct {
 	Keyspace string
 	Username string
 }
+
+type SystemViewSystemLog struct {
+	Timestamp string
+	Level string
+	Logger string
+	Message string
+}

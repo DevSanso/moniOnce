@@ -1,4 +1,4 @@
-create table mcsa_db_message_queue (
+create table mcsa_message_queue (
     object_id bigint,
     collect_time timestamp,
     message_type text,

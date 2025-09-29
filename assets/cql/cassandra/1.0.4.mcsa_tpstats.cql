@@ -1,4 +1,4 @@
-create table mcsa_db_tpstats (
+create table mcsa_tpstats (
     object_id bigint,
     collect_time timestamp,
     pool_name text,

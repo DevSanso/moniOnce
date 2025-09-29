@@ -11,12 +11,12 @@ import (
 	"time"
 )
 
-func collectCQLSystemTracesSessions(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error) {
+func collectCQLSystemViewSystemLogs(ctx context.Context, ctl *cassandra.CassandraConn, log logger.LevelLogger) (*types.PushData, error) {
 	interval := ctx.Value(key.ContextIntervalKey).(int)
 	
-	rows, rowsErr := cassandra.CassandraConnRunQuery(ctl, ctx, _CqlSystemTracesQuery, 5, func(p *dataframe.TracesSession, scanFn func(...any) error) error {
+	rows, rowsErr := cassandra.CassandraConnRunQuery(ctl, ctx, _CqlSystemViewSystemLogsQuery, 5, func(p *dataframe.SystemViewSystemLog, scanFn func(...any) error) error {
 		row := p
-		if err := scanFn(&row.SessionID, &row.Client, &row.Command, &row.Coordinator, &row.CoordiantorPort, &row.Duration, &row.Parameters, &row.Request, &row.Started_at); err != nil {
+		if err := scanFn(&row.Timestamp, &row.Level, &row.Logger, &row.Message); err != nil {
 			return err
 		}
 
@@ -31,8 +31,8 @@ func collectCQLSystemTracesSessions(ctx context.Context, ctl *cassandra.Cassandr
 	pushData := new(types.PushData)
 	pushData.NowTimeUnixEpoch = time.Now().Unix()
 	pushData.ConnTypeId = int(constants.ConnTypeCQLTool)
-	pushData.DataId = int(constants.CQLTracesSessions)
-	pushData.Cql.TracesSession = rows
+	pushData.DataId = int(constants.CQLSystemLog)
+	pushData.Cql.SystemLogs = rows
 
 	return pushData, nil
 

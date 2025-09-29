@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"agent_common/pkg/applnew/constants/context/key"
 	"agent_common/pkg/applnew/loader"
 	"agent_common/pkg/applnew/logger"
 	apptype "agent_common/pkg/applnew/types"
@@ -9,43 +10,44 @@ import (
 	"time"
 )
 
-
-type CronThread[PUSH any,FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
-	recv types.Deque[string]
-	pushSend types.Pusher[*PUSH]
+type CronThread[PUSH any, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
+	recv       types.Deque[apptype.IntervalData]
+	pushSend   types.Pusher[*PUSH]
 	confLoader loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, *apptype.AppSyncData, FLAGPTR]
-	mapping map[string]apptype.CronFn[PUSH, FLAG, FLAGPTR]
+	mapping    map[string]apptype.CronFn[PUSH, FLAG, FLAGPTR]
 
 	cronLogger logger.LevelLogger
 }
 
-func NewCronThread[PUSH any,FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]](
-	recv types.Deque[string], 
+func NewCronThread[PUSH any, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]](
+	recv types.Deque[apptype.IntervalData],
 	pusher types.Pusher[*PUSH],
 	mapping map[string]apptype.CronFn[PUSH, FLAG, FLAGPTR],
 	logger logger.LevelLogger,
 	confLoader loader.Configure[apptype.ApplConfData, apptype.AppSyncData, FLAG, *apptype.ApplConfData, *apptype.AppSyncData, FLAGPTR]) CronThread[PUSH, FLAG, FLAGPTR] {
 	return CronThread[PUSH, FLAG, FLAGPTR]{
-		recv: recv,
-		pushSend: pusher,
-		mapping: mapping,
+		recv:       recv,
+		pushSend:   pusher,
+		mapping:    mapping,
 		confLoader: confLoader,
 		cronLogger: logger,
 	}
 }
 
-func (ct *CronThread[PUSH, FLAG, FLAGPTR])Run(ctx context.Context) error {
+func (ct *CronThread[PUSH, FLAG, FLAGPTR]) Run(ctx context.Context) error {
 	isStop := false
 	for !isStop {
 
-		data,_ := ct.recv.Pop()
-		f, ok := ct.mapping[data]
-		
+		data, _ := ct.recv.Pop()
+		f, ok := ct.mapping[data.Name]
+
 		if ok {
 			if flag, err := ct.confLoader.LoadFlag(); err != nil {
 				ct.cronLogger.Error("load flag is failed : ", err.Error())
 			} else {
-				ret, retErr := f(ctx, flag, ct.confLoader, ct.cronLogger)
+				timeCtx, cancelFn := context.WithTimeout(ctx, time.Second * (time.Duration(data.Interval) - 1))
+				dataCtx := context.WithValue(context.WithValue(timeCtx, key.ContextNameKey, data.Name), key.ContextIntervalKey, data.Interval)
+				ret, retErr := f(dataCtx, flag, ct.confLoader, ct.cronLogger)
 				if retErr != nil {
 					ct.cronLogger.Error("cronFn exec failed :", retErr.Error())
 				}
@@ -53,10 +55,10 @@ func (ct *CronThread[PUSH, FLAG, FLAGPTR])Run(ctx context.Context) error {
 				if ret != nil {
 					ct.pushSend.Push(ret)
 				}
-				
-			}			
+				cancelFn()
+			}
 		}
-		
+
 		select {
 		case <-ctx.Done():
 			isStop = true
