@@ -10,6 +10,7 @@ import (
 	"agent_common/pkg/util/writer"
 	"context"
 	"database/sql"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -109,7 +110,7 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) initThread(data apptype.Ini
 	}
 	i.thread.pushT = make([]thread.PushThread[PUSH], 1)
 	for n := 0; n < i.config.Thread.PushCount; n++ {
-		t := thread.NewPushThread(i.queue.pushQ, i.loggers.pushLogger, i.dataPusher)
+		t := thread.NewPushThread(i.setting.ObjectId, i.queue.pushQ, i.loggers.pushLogger, i.dataPusher)
 		i.thread.pushT = append(i.thread.pushT, t)
 	}
 }
@@ -131,6 +132,13 @@ func (i *implApplication[PUSH, CONN, FLAG, FLAGPTR]) Init(data apptype.InitData[
 		i.loggers.initLogger.Error("init config failed :", err.Error())
 		return err
 	}
+
+	if i.config.Version != data.Version {
+		err := fmt.Errorf("not matching config version(%f) != agent version(%f)", i.config.Version, data.Version)
+		i.loggers.initLogger.Error(err.Error())
+		return err
+	}
+
 	i.loggers.initLogger.Debug("read config db done")
 	if err := i.initCollectConnPool(data); err != nil {
 		i.loggers.initLogger.Error("init collect conn pool : ", err.Error())

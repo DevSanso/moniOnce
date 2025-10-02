@@ -5,7 +5,7 @@ create table mcsa_tpstats (
     active bigint,
     pending bigint,
     completed bigint,
-    blocked bigint
-
-    primary key(object_id, pool_name, collect_time)
+    blocked bigint,
+    agent_version float,
+    primary key((object_id, agent_version), pool_name, collect_time)
 ) WITH CLUSTERING ORDER BY (collect_time DESC);

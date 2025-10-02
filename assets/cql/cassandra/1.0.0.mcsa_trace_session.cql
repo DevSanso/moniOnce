@@ -11,6 +11,6 @@ create table mcsa_trace_session (
     started_at timestamp,
     param_1 text,
     param_2 text,
-
-    primary key(object_id, collect_time, session_id)
+    agent_version float,
+    primary key((object_id, agent_version), collect_time, session_id)
 ) WITH CLUSTERING ORDER BY (collect_time DESC);

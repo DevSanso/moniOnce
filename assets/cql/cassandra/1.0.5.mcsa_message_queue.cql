@@ -7,5 +7,6 @@ create table mcsa_message_queue (
     percentile_95 float,
     percentile_99 float,
     max           float,
-    primary key(object_id, message_type, collect_time)
+    agent_version float,
+    primary key((object_id, agent_version), message_type, collect_time)
 ) WITH CLUSTERING ORDER BY (collect_time DESC);

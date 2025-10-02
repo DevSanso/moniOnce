@@ -8,5 +8,6 @@ create table mcsa_clients (
     request_count bigint,
     keyspace_name text,
     username text,
-    primary key(object_id, keyspace_name, username, "address", request_count, collect_time)
+    agent_version float,
+    primary key((object_id, agent_version), keyspace_name, username, "address", request_count, collect_time)
 ) WITH CLUSTERING ORDER BY (collect_time DESC, request_count DESC);

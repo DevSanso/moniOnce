@@ -8,5 +8,6 @@ CREATE TABLE msca_trace_events (
     source_elapsed int,
     source_port int,
     thread text,
-    PRIMARY KEY (object_id, collect_time, session_id, event_id)
+    agent_version float,
+    PRIMARY KEY ((object_id, agent_version), collect_time, session_id, event_id)
 ) WITH CLUSTERING ORDER BY (collect_time DESC);

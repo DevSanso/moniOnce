@@ -5,5 +5,6 @@ CREATE TABLE msca_host_cpu_data (
     user float,
     wait float,
     idle float,
-    PRIMARY KEY (object_id, collect_time)
+    agent_version float,
+    PRIMARY KEY ((object_id, agent_version), collect_time)
 ) WITH CLUSTERING ORDER BY (collect_time DESC);

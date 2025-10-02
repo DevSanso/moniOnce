@@ -7,6 +7,7 @@ import (
 
 type InitData[PUSH any, CONN io.Closer, FLAG any, FLAGPTR types.GetterKeysetterInter[FLAG]] struct {
 	SettingPath string
+	Version    float64
 	CollectM map[string]CollectFn[PUSH, CONN]
 	CronM map[string]CronFn[PUSH, FLAG, FLAGPTR]
 

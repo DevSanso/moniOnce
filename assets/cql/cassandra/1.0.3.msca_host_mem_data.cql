@@ -4,5 +4,6 @@ CREATE TABLE msca_host_mem_data (
     total bigint,
     free bigint,
     used bigint,
-    PRIMARY KEY (object_id, collect_time)
+    agent_version float,
+    PRIMARY KEY ((object_id, agent_version), collect_time)
 ) WITH CLUSTERING ORDER BY (collect_time DESC);

@@ -6,6 +6,8 @@ import (
 )
 
 type ApplConfData struct {
+	Version float64
+	
 	CollecbDbConfig struct {
 		Url string
 	}

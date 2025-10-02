@@ -6,5 +6,6 @@ CREATE TABLE mcsa_system_logs (
     "level" text,
     logger text,
     "message" text,
-    PRIMARY KEY (object_id, collect_time, log_time)
+    agent_version float,
+    PRIMARY KEY ((object_id, agent_version), collect_time, log_time)
 ) WITH CLUSTERING ORDER BY (collect_time DESC, log_time DESC)

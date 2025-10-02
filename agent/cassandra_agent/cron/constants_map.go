@@ -7,5 +7,5 @@ import (
 
 
 var CronMappsing  map[string]appltype.CronFn[types.PushData, types.FlagData, *types.FlagData] = map[string]appltype.CronFn[types.PushData, types.FlagData, *types.FlagData]{
-	
+	"cron.syncFlag" : cronFlagSync,
 }

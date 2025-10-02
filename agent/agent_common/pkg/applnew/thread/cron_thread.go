@@ -47,7 +47,7 @@ func (ct *CronThread[PUSH, FLAG, FLAGPTR]) Run(ctx context.Context) error {
 			} else {
 				timeCtx, cancelFn := context.WithTimeout(ctx, time.Second * (time.Duration(data.Interval) - 1))
 				dataCtx := context.WithValue(context.WithValue(timeCtx, key.ContextNameKey, data.Name), key.ContextIntervalKey, data.Interval)
-				ret, retErr := f(dataCtx, flag, ct.confLoader, ct.cronLogger)
+				ret, retErr := f(dataCtx, flag, ct.cronLogger)
 				if retErr != nil {
 					ct.cronLogger.Error("cronFn exec failed :", retErr.Error())
 				}
